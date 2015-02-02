@@ -655,8 +655,13 @@ class Parser(object):
         for targ in p1:
             store_ctx(targ)
         if lenp == 3:
-            p0 = ast.Assign(targets=p1, value=p2, lineno=self.lineno, 
-                            col_offset=self.col)
+            if p2 is None and len(p1) == 1:
+                p0 = self.expr(p1[0])
+            elif p2 is None:
+                assert False
+            else:
+                p0 = ast.Assign(targets=p1, value=p2, lineno=self.lineno, 
+                                col_offset=self.col)
         elif lenp == 4:
             op = self._augassign_op[p2]()
             p0 = ast.AugAssign(target=p1[0], op=op, value=p[3], 
