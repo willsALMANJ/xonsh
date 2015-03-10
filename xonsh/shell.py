@@ -25,8 +25,14 @@ def setup_readline():
     import ctypes.util
     readline.set_completer_delims(' \t\n')
     lib = ctypes.cdll.LoadLibrary(readline.__file__)
-    RL_POINT = ctypes.c_int.in_dll(lib, 'rl_point')
-    RL_COMPLETION_SUPPRESS_APPEND = ctypes.c_int.in_dll(lib, 
+    try:
+        RL_POINT = ctypes.c_int.in_dll(lib, 'rl_point')
+        RL_COMPLETION_SUPPRESS_APPEND = ctypes.c_int.in_dll(lib, 
+                                            'rl_completion_suppress_append')
+    except ValueError:
+        lib = ctypes.cdll.LoadLibrary(ctypes.util.find_library('readline'))
+        RL_POINT = ctypes.c_int.in_dll(lib, 'rl_point')
+        RL_COMPLETION_SUPPRESS_APPEND = ctypes.c_int.in_dll(lib, 
                                             'rl_completion_suppress_append')
     # reads in history
     env = builtins.__xonsh_env__
