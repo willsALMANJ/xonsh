@@ -4,6 +4,7 @@ import os
 import re
 import builtins
 import subprocess
+from collections import MutableMapping
 
 from xonsh.tools import subexpr_from_unbalanced
 from xonsh.built_ins import iglobpath
