@@ -1,44 +1,18 @@
 """Aliases for the xonsh shell.
 """
 import os
+import shlex
 import platform
 import builtins
 import subprocess
-import shlex
-import signal
 from warnings import warn
 
-from xonsh.dirstack import dirs, pushd, popd
+from xonsh.dirstack import cd, pushd, popd, dirs
 from xonsh.jobs import jobs, fg, bg, kill_all_jobs
-
-def cd(args, stdin=None):
-    """Changes the directory.
-
-    If no directory is specified (i.e. if `args` is None) then this
-    changes to the current user's home directory.
-    """
-    env = builtins.__xonsh_env__
-    cur_oldpwd = env.get('OLDPWD', os.getcwd())
-    if len(args) == 0:
-        d = os.path.expanduser('~')
-    elif len(args) == 1:
-        d = os.path.expanduser(args[0])
-        if d == '-':
-            d = cur_oldpwd
-    else:
-        return '', 'cd takes 0 or 1 arguments, not {0}\n'.format(len(args))
-    if not os.path.exists(d):
-        return '', 'cd: no such file or directory: {0}\n'.format(d)
-    if not os.path.isdir(d):
-        return '', 'cd: {0} is not a directory\n'.format(d)
-
-    env['OLDPWD'] = os.getcwd()
-    os.chdir(d)
-    env['PWD'] = os.getcwd()
-    return None, None
+from xonsh.timings import timeit_alias
 
 
-def exit(args, stdin=None):
+def exit(args, stdin=None):  # pylint:disable=redefined-builtin,W0622
     """Sends signal to exit shell."""
     builtins.__xonsh_exit__ = True
     kill_all_jobs()
@@ -53,9 +27,11 @@ def source_bash(args, stdin=None):
     denv = env.detype()
     with tempfile.NamedTemporaryFile(mode='w+t') as f:
         args = ' '.join(args)
-        input = 'source {0}\nenv >> {1}\n'.format(args, f.name)
+        inp = 'source {0}\nenv >> {1}\n'.format(args, f.name)
         try:
-            subprocess.check_output(['bash'], input=input, env=denv,
+            subprocess.check_output(['bash'],
+                                    input=inp,
+                                    env=denv,
                                     stderr=subprocess.PIPE,
                                     universal_newlines=True)
         except subprocess.CalledProcessError:
@@ -71,10 +47,27 @@ def source_bash(args, stdin=None):
     return
 
 
+def xexec(args, stdin=None):
+    """
+    Replaces current process with command specified and passes in the
+    current xonsh environment.
+    """
+    env = builtins.__xonsh_env__
+    denv = env.detype()
+    if (len(args) > 0):
+        try:
+            os.execvpe(args[0], args, denv)
+        except FileNotFoundError as e:
+            return "xonsh: " + e.args[1] + ": " + args[0] + "\n"
+    else:
+        return "xonsh: exec: no args specified\n"
+
+
 def bash_aliases():
     """Computes a dictionary of aliases based on Bash's aliases."""
     try:
-        s = subprocess.check_output(['bash', '-i'], input='alias',
+        s = subprocess.check_output(['bash', '-i'],
+                                    input='alias',
                                     stderr=subprocess.PIPE,
                                     universal_newlines=True)
     except subprocess.CalledProcessError:
@@ -105,11 +98,13 @@ DEFAULT_ALIASES = {
     'EOF': exit,
     'exit': exit,
     'quit': exit,
+    'xexec': xexec,
+    'timeit': timeit_alias,
     'source-bash': source_bash,
     'grep': ['grep', '--color=auto'],
     'scp-resume': ['rsync', '--partial', '-h', '--progress', '--rsh=ssh'],
     'ipynb': ['ipython', 'notebook', '--no-browser'],
-    }
+}
 
 if platform.system() == 'Darwin':
     DEFAULT_ALIASES['ls'] = ['ls', '-G']

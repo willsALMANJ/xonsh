@@ -8,6 +8,7 @@ try:
     from setuptools import setup
     from setuptools.command.sdist import sdist
     from setuptools.command.install import install
+    from setuptools.command.develop import develop
     HAVE_SETUPTOOLS = True
 except ImportError:
     from distutils.core import setup
@@ -45,6 +46,14 @@ class xsdist(sdist):
         build_tables()
         sdist.make_release_tree(self, basedir, files)
 
+if HAVE_SETUPTOOLS:
+    class xdevelop(develop):
+        def run(self):
+            clean_tables()
+            build_tables()
+            develop.run(self)
+
+
 def main():
     if sys.version_info[0] < 3:
         sys.exit('xonsh currently requires Python 3.4+')
@@ -65,7 +74,7 @@ def main():
         author_email='scopatz@gmail.com',
         url='https://github.com/scopatz/xonsh',
         platforms='Cross Platform',
-        classifiers = ['Programming Language :: Python :: 3'],
+        classifiers=['Programming Language :: Python :: 3'],
         packages=['xonsh', 'xonsh.man'],
         scripts=['scripts/xonsh'],
         cmdclass={'install': xinstall, 'sdist': xsdist},
@@ -73,6 +82,12 @@ def main():
     if HAVE_SETUPTOOLS:
         skw['setup_requires'] = ['ply']
         skw['install_requires'] = ['ply']
+        skw['entry_points'] = {
+            'pygments.lexers': ['xonsh = xonsh.pyghooks:XonshLexer',
+                                'xonshcon = xonsh.pyghooks:XonshConsoleLexer',
+                                ],
+            }
+        skw['cmdclass']['develop'] = xdevelop
     setup(**skw)
 
 logo = """

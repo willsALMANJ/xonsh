@@ -16,8 +16,11 @@ from xonsh.built_ins import load_builtins, unload_builtins
 class Execer(object):
     """Executes xonsh code in a context."""
 
-    def __init__(self, filename='<xonsh-code>', debug_level=0,
-                 parser_args=None):
+    def __init__(self,
+                 filename='<xonsh-code>',
+                 debug_level=0,
+                 parser_args=None,
+                 unload=True):
         """Parameters
         ----------
         filename : str, optional
@@ -26,16 +29,20 @@ class Execer(object):
             Debugging level to use in lexing and parsing.
         parser_args : dict, optional
             Arguments to pass down to the parser.
+        unload : bool, optional
+            Whether or not to unload xonsh builtins upon deletion.
         """
         parser_args = parser_args or {}
         self.parser = Parser(**parser_args)
         self.filename = filename
         self.debug_level = debug_level
+        self.unload = unload
         self.ctxtransformer = ast.CtxAwareTransformer(self.parser)
         load_builtins(execer=self)
 
     def __del__(self):
-        unload_builtins()
+        if self.unload:
+            unload_builtins()
 
     def parse(self, input, ctx, mode='exec'):
         """Parses xonsh code in a context-aware fashion. For context-free
@@ -73,10 +80,13 @@ class Execer(object):
         tree = self.ctxtransformer.ctxvisit(tree, input, ctx, mode=mode)
         return tree
 
-    def compile(self, input, mode='exec', glbs=None, locs=None, stacklevel=2):
+    def compile(self, input, mode='exec', glbs=None, locs=None, stacklevel=2,
+                filename=None):
         """Compiles xonsh code into a Python code object, which may then
         be execed or evaled.
         """
+        if filename is None:
+            filename = self.filename
         if glbs is None or locs is None:
             frame = inspect.stack()[stacklevel][0]
             glbs = frame.f_globals if glbs is None else glbs
@@ -85,7 +95,7 @@ class Execer(object):
         tree = self.parse(input, ctx, mode=mode)
         if tree is None:
             return None  # handles comment only input
-        code = compile(tree, self.filename, mode)
+        code = compile(tree, filename, mode)
         return code
 
     def eval(self, input, glbs=None, locs=None, stacklevel=2):
@@ -93,7 +103,10 @@ class Execer(object):
         if isinstance(input, types.CodeType):
             code = input
         else:
-            code = self.compile(input=input, glbs=glbs, locs=locs, mode='eval',
+            code = self.compile(input=input,
+                                glbs=glbs,
+                                locs=locs,
+                                mode='eval',
                                 stacklevel=stacklevel)
         if code is None:
             return None  # handles comment only input
@@ -104,11 +117,27 @@ class Execer(object):
         if isinstance(input, types.CodeType):
             code = input
         else:
-            code = self.compile(input=input, glbs=glbs, locs=locs, mode=mode,
+            code = self.compile(input=input,
+                                glbs=glbs,
+                                locs=locs,
+                                mode=mode,
                                 stacklevel=stacklevel)
         if code is None:
             return None  # handles comment only input
         return exec(code, glbs, locs)
+
+    def _find_next_break(self, line, mincol):
+        if mincol >= 1:
+            line = line[mincol:]
+        if ';' not in line:
+            return None
+        maxcol = None
+        self.parser.lexer.input(line)
+        for tok in self.parser.lexer:
+            if tok.type == 'SEMI':
+                maxcol = tok.lexpos + mincol + 1
+                break
+        return maxcol
 
     def _parse_ctx_free(self, input, mode='exec'):
         last_error_line = last_error_col = -1
@@ -116,7 +145,8 @@ class Execer(object):
         original_error = None
         while not parsed:
             try:
-                tree = self.parser.parse(input, filename=self.filename,
+                tree = self.parser.parse(input,
+                                         filename=self.filename,
                                          mode=mode,
                                          debug_level=self.debug_level)
                 parsed = True
@@ -148,12 +178,11 @@ class Execer(object):
                     last_error_line = last_error_col = -1
                     input = '\n'.join(lines)
                     continue
-                if line.startswith('$'):
-                    raise original_error
-                maxcol = line.find(';', last_error_col)
-                maxcol = None if maxcol < 0 else maxcol + 1
-                sbpline = subproc_toks(line, returnline=True,
-                                       maxcol=maxcol, lexer=self.parser.lexer)
+                maxcol = self._find_next_break(line, last_error_col)
+                sbpline = subproc_toks(line,
+                                       returnline=True,
+                                       maxcol=maxcol,
+                                       lexer=self.parser.lexer)
                 if sbpline is None:
                     # subprocess line had no valid tokens, likely because
                     # it only contained a comment.

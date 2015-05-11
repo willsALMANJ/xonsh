@@ -49,17 +49,18 @@ def _give_terminal_to(pgid):
     # over-simplified version of:
     #    give_terminal_to from bash 4.3 source, jobs.c, line 4030
     # this will give the terminal to the process group pgid
-    if _shell_tty is not None:
+    if _shell_tty is not None and os.isatty(_shell_tty):
         oldmask = signal.pthread_sigmask(signal.SIG_BLOCK, _block_when_giving)
         os.tcsetpgrp(_shell_tty, pgid)
         signal.pthread_sigmask(signal.SIG_SETMASK, oldmask)
 
 
 def print_one_job(num):
-    """
-    Print a line describing job number ``num``.
-    """
-    job = builtins.__xonsh_all_jobs__[num]
+    """Print a line describing job number ``num``."""
+    try:
+        job = builtins.__xonsh_all_jobs__[num]
+    except KeyError:
+        return
     act = '*' if num == builtins.__xonsh_active_job__ else ' '
     status = job['status']
     cmd = [' '.join(i) if isinstance(i, list) else i for i in job['cmds']]
@@ -70,14 +71,30 @@ def print_one_job(num):
 
 
 def get_next_job_number():
-    """
-    Get the lowest available unique job number (for the next job created)
+    """Get the lowest available unique job number (for the next job created).
     """
     _clear_dead_jobs()
     i = 1
     while i in builtins.__xonsh_all_jobs__:
         i += 1
     return i
+
+
+def add_job(info):
+    """
+    Add a new job to the jobs dictionary.
+    """
+    info['started'] = time.time()
+    info['status'] = 'running'
+    try:
+        info['pgrp'] = os.getpgid(info['obj'].pid)
+    except ProcessLookupError:
+        return
+    num = get_next_job_number()
+    builtins.__xonsh_all_jobs__[num] = info
+    builtins.__xonsh_active_job__ = num
+    if info['bg']:
+        print_one_job(num)
 
 
 def _default_sigint_handler(num, frame):
@@ -102,18 +119,18 @@ def wait_for_active_job():
     pgrp = job['pgrp']
     obj.done = False
 
-    def handle_sigchld(num, frame):
+    _give_terminal_to(pgrp)  # give the terminal over to the fg process
+    _, s = os.waitpid(obj.pid, os.WUNTRACED)
+    if os.WIFSTOPPED(s):
         obj.done = True
         job['bg'] = True
         job['status'] = 'stopped'
-
-    _give_terminal_to(pgrp)  # give the terminal over to the fg process
-    signal.signal(signal.SIGCHLD, handle_sigchld)
-    while obj.poll() is None and not obj.done:
-        time.sleep(0.1)
+        print()  # get a newline because ^Z will have been printed
+        print_one_job(act)
+    elif os.WIFSIGNALED(s):
+        print()  # get a newline because ^C will have been printed
     if obj.poll() is not None:
         builtins.__xonsh_active_job__ = None
-    signal.signal(signal.SIGCHLD, signal.SIG_DFL)
     _give_terminal_to(_shell_pgrp)  # give terminal back to the shell
 
 
@@ -154,7 +171,7 @@ def fg(args, stdin=None):
     elif len(args) == 1:
         try:
             act = int(args[0])
-        except:
+        except ValueError:
             return '', 'Invalid job: {}\n'.format(args[0])
         if act not in builtins.__xonsh_all_jobs__:
             return '', 'Invalid job: {}\n'.format(args[0])
@@ -184,7 +201,7 @@ def bg(args, stdin=None):
     elif len(args) == 1:
         try:
             act = int(args[0])
-        except:
+        except ValueError:
             return '', 'Invalid job: {}\n'.format(args[0])
         if act not in builtins.__xonsh_all_jobs__:
             return '', 'Invalid job: {}\n'.format(args[0])

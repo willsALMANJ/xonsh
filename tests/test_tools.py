@@ -1,13 +1,11 @@
 """Tests the xonsh lexer."""
 from __future__ import unicode_literals, print_function
-import os
-import sys
 
 import nose
-from nose.tools import assert_equal, assert_true
+from nose.tools import assert_equal
 
 from xonsh.lexer import Lexer
-from xonsh.tools import subproc_toks
+from xonsh.tools import subproc_toks, subexpr_from_unbalanced
 
 LEXER = Lexer()
 LEXER.build()
@@ -56,6 +54,30 @@ def test_subproc_toks_indent_ls_nl():
                        returnline=True)
     assert_equal(exp, obs)
 
+def test_subproc_toks_indent_ls_no_min():
+    s = 'ls -l'
+    exp = INDENT + '$[{0}]'.format(s)
+    obs = subproc_toks(INDENT + s, lexer=LEXER, returnline=True)
+    assert_equal(exp, obs)
+
+def test_subproc_toks_indent_ls_no_min_nl():
+    s = 'ls -l'
+    exp = INDENT + '$[{0}]\n'.format(s)
+    obs = subproc_toks(INDENT + s + '\n', lexer=LEXER, returnline=True)
+    assert_equal(exp, obs)
+
+def test_subproc_toks_indent_ls_no_min_semi():
+    s = 'ls'
+    exp = INDENT + '$[{0}];'.format(s)
+    obs = subproc_toks(INDENT + s + ';', lexer=LEXER, returnline=True)
+    assert_equal(exp, obs)
+
+def test_subproc_toks_indent_ls_no_min_semi_nl():
+    s = 'ls'
+    exp = INDENT + '$[{0}];\n'.format(s)
+    obs = subproc_toks(INDENT + s + ';\n', lexer=LEXER, returnline=True)
+    assert_equal(exp, obs)
+
 def test_subproc_toks_ls_comment():
     s = 'ls -l'
     com = '  # lets list'
@@ -75,14 +97,6 @@ def test_subproc_toks_ls_str_comment():
     com = '  # lets list'
     exp = '$[{0}]{1}'.format(s, com)
     obs = subproc_toks(s + com, lexer=LEXER, returnline=True)
-    assert_equal(exp, obs)
-
-def test_subproc_toks_ls_l_semi_ls_first():
-    lsdl = 'ls -l'
-    ls = 'ls'
-    s = '{0}; {1}'.format(lsdl, ls)
-    exp = '$[{0}]; {1}'.format(lsdl, ls)
-    obs = subproc_toks(s, lexer=LEXER, returnline=True)
     assert_equal(exp, obs)
 
 def test_subproc_toks_ls_l_semi_ls_first():
@@ -121,6 +135,16 @@ def test_subproc_toks_comment():
     exp = None
     obs = subproc_toks('# I am a comment', lexer=LEXER, returnline=True)
     assert_equal(exp, obs)
+
+def test_subexpr_from_unbalanced_parens():
+    cases = [
+        ('f(x.', 'x.'),
+        ('f(1,x.', 'x.'),
+        ('f((1,10),x.y', 'x.y'),
+        ]
+    for expr, exp in cases:
+        obs = subexpr_from_unbalanced(expr, '(', ')')
+        yield assert_equal, exp, obs
 
 
 if __name__ == '__main__':

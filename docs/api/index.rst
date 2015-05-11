@@ -14,6 +14,7 @@ For those of you who want the gritty details.
     parser
     ast
     execer
+    imphooks
 
 
 **Command Prompt:**
@@ -37,5 +38,7 @@ For those of you who want the gritty details.
     :maxdepth: 1
 
     tools
+    lazyjson
     openpy
     main
+    pyghooks
