@@ -371,7 +371,11 @@ class Completer(object):
             return self._cmds_cache
         allcmds = set()
         for d in filter(os.path.isdir, path):
-            allcmds |= set(os.listdir(d))
+            if ON_WINDOWS:
+                allcmds |= {f for f in os.listdir(d) 
+                            if f.lower().endswith(('.exe','.bat')) } 
+            else:
+                allcmds |= set(os.listdir(d))
         allcmds |= set(builtins.aliases.keys())
         self._cmds_cache = frozenset(allcmds)
         return self._cmds_cache
