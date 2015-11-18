@@ -2329,17 +2329,51 @@ class Parser(object):
                 | PIPE WS
                 | WS PIPE WS
         """
-        p1 = p[1]
-        if len(p) > 2 and len(p1.strip()) == 0:
-            p1 = p[2]
-        p[0] = ast.Str(s=p1, lineno=self.lineno, col_offset=self.col)
+        p[0] = ast.Str(s='|', lineno=self.lineno, col_offset=self.col)
+
+    def p_subproc_and(self, p):
+        """subproc_and : AND
+                       | WS AND
+                       | AND WS
+                       | WS AND WS
+        """
+        p[0] = ast.Str(s='and', lineno=self.lineno, col_offset=self.col)
+
+    def p_subproc_and_not(self, p):
+        """subproc_and_not : subproc_and WS NOT
+                           | subproc_and WS NOT WS
+        """
+        p[0] = ast.Str(s='andnot', lineno=self.lineno, col_offset=self.col)
+
+    def p_subproc_or(self, p):
+        """subproc_or : OR
+                      | WS OR
+                      | OR WS
+                      | WS OR WS
+        """
+        p[0] = ast.Str(s='or', lineno=self.lineno, col_offset=self.col)
+
+    def p_subproc_or_not(self, p):
+        """subproc_or_not : subproc_or WS NOT
+                          | subproc_or WS NOT WS
+        """
+        p[0] = ast.Str(s='ornot', lineno=self.lineno, col_offset=self.col)
+
+    def p_pipeliner(self, p):
+        """pipeliner : pipe
+                     | subproc_and
+                     | subproc_and_not
+                     | subproc_or
+                     | subproc_or_not
+        """
+        p[0] = p[1]
 
     def p_subproc(self, p):
         """subproc : subproc_atoms
                    | subproc_atoms WS
                    | subproc AMPERSAND
-                   | subproc pipe subproc_atoms
-                   | subproc pipe subproc_atoms WS
+                   | subproc pipeliner subproc_atoms
+                   | subproc pipeliner subproc_atoms WS
         """
         lineno = self.lineno
         col = self.col

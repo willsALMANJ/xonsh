@@ -76,6 +76,8 @@ def check_xonsh_ast(xenv, inp, run=True, mode='eval'):
         obs = PARSER.parse(inp, debug_level=DEBUG_LEVEL)
         if obs is None:
             return  # comment only
+        if DEBUG_LEVEL > 0:
+            print(ast.dump(obs))
         bytecode = compile(obs, '<test-xonsh-ast>', mode)
         if run:
             exec(bytecode)
@@ -1510,6 +1512,30 @@ def test_two_cmds_one_pipe():
 
 def test_three_cmds_two_pipes():
     yield check_xonsh_ast, {}, '$(ls | grep wakka | grep jawaka)', False
+
+def test_two_cmds_one_and():
+    yield check_xonsh_ast, {}, '$(ls me and ls you)', False
+
+def test_three_cmds_two_ands():
+    yield check_xonsh_ast, {}, '$(ls you and ls me and ls dupree)', False
+
+def test_two_cmds_one_andnot():
+    yield check_xonsh_ast, {}, '$(ls me and not ls you)', False
+
+def test_three_cmds_two_andnots():
+    yield check_xonsh_ast, {}, '$(ls you and not ls me and not ls dupree)', False
+
+def test_two_cmds_one_or():
+    yield check_xonsh_ast, {}, '$(ls me or ls you)', False
+
+def test_three_cmds_two_ors():
+    yield check_xonsh_ast, {}, '$(ls you or ls me or ls dupree)', False
+
+def test_two_cmds_one_ornot():
+    yield check_xonsh_ast, {}, '$(ls me or not ls you)', False
+
+def test_three_cmds_two_ornots():
+    yield check_xonsh_ast, {}, '$(ls you or not ls me or not ls dupree)', False
 
 def test_one_cmd_write():
     yield check_xonsh_ast, {}, '$(ls > x.py)', False
