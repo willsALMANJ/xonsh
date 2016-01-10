@@ -165,9 +165,40 @@ class CtxAwareTransformer(NodeTransformer):
                                col_offset=node.col_offset)
             return newnode
 
+    def _is_envvar(self, expr):
+        return (isinstance(expr, Call) and
+                isinstance(expr.func, Attribute) and
+                isinstance(expr.func.value, Name) and
+                expr.func.value.id == '__xonsh_env__' and
+                expr.func.attr == 'get')
+
+    def _envvar_for_assign(self, expr):
+        idx = Index(value=expr.args[0],
+                    lineno=expr.lineno,
+                    col_offset=expr.col_offset)
+        return Subscript(value=expr.func.value,
+                         slice=idx,
+                         ctx=Store(),
+                         lineno=expr.lineno,
+                         col_offset=expr.col_offset)
+
+    def _update_env_lookups(self, l):
+        o = []
+        for i in l:
+            if self._is_envvar(i):
+                a = self._envvar_for_assign(i)
+            elif isinstance(i, (Tuple, List)):
+                i.elts = self._update_env_lookups(i.elts)
+                a = i
+            else:
+                a = i
+            o.append(a)
+        return o
+
     def visit_Assign(self, node):
         """Handle visiting an assignment statement."""
         ups = set()
+        node.targets = self._update_env_lookups(node.targets)
         for targ in node.targets:
             if isinstance(targ, (Tuple, List)):
                 ups.update(leftmostname(elt) for elt in targ.elts)
