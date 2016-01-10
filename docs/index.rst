@@ -209,7 +209,7 @@ table lists features and capabilities that various tools may or may not share.
       - ✓
       - 
       - ✓
-      - 
+      - ✓
       - 
       - ✓
     * - Rich history
