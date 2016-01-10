@@ -1451,9 +1451,6 @@ def test_dollar_py_test_recursive_test():
     yield check_xonsh_ast, {'WAKKA': 42, 'JAWAKA': 'WAKKA'}, \
                            '${${"JAWA" + $JAWAKA[-2:]}}'
 
-def test_dollar_name_set():
-    yield check_xonsh, {'WAKKA': 42}, '$WAKKA = 42'
-
 def test_dollar_py_set():
     yield check_xonsh, {'WAKKA': 42}, 'x = "WAKKA"; ${x} = 65'
 
