@@ -2426,6 +2426,23 @@ class Parser(object):
                     p0 = self._envvar_by_name(p1[1:],
                                               lineno=self.lineno,
                                               col=self.col)
+                    # in subprocess mode, replace None with an empty string
+                    _none = ast.NameConstant(value=None,
+                                             lineno=self.lineno,
+                                             col_offset=self.col)
+                    _emptystr = ast.Str(s='',
+                                        lineno=self.lineno,
+                                        col_offset=self.col)
+                    p0 = ast.IfExp(test=ast.Compare(left=p0,
+                                                    ops=[ast.IsNot(lineno=self.lineno,
+                                                                   col_offset=self.col)],
+                                                    comparators=[_none],
+                                                    lineno=self.lineno,
+                                                    col_offset=self.col),
+                                   body=p0,
+                                   orelse=_emptystr,
+                                   lineno=self.lineno,
+                                   col_offset=self.col)
                     p0 = xonsh_call('__xonsh_ensure_list_of_strs__', [p0],
                                     lineno=self.lineno,
                                     col=self.col)
