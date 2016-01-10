@@ -2301,12 +2301,18 @@ class Parser(object):
     def _envvar_by_name(self, var, lineno=None, col=None):
         """Looks up a xonsh variable by name."""
         xenv = self._xenv(lineno=lineno, col=col)
-        idx = ast.Index(value=ast.Str(s=var, lineno=lineno, col_offset=col))
-        return ast.Subscript(value=xenv,
-                             slice=idx,
-                             ctx=ast.Load(),
+        func = ast.Attribute(value=xenv,
+                             attr='get',
+                             ctx = ast.Load(),
                              lineno=lineno,
                              col_offset=col)
+        return ast.Call(func=func,
+                        args=[ast.Str(s=var, lineno=lineno, col_offset=col)],
+                        keywords=[],
+                        starargs=None,
+                        kwargs=None,
+                        lineno=lineno,
+                        col_offset=col)
 
     def _subproc_cliargs(self, args, lineno=None, col=None):
         """Creates an expression for subprocess CLI arguments."""
